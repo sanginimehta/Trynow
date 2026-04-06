@@ -1,20 +1,23 @@
 """
-Reads prospects.csv (name, company, url), generates a personalized outreach
-email for each one using OpenAI, and saves results to output.csv.
+Reads prospects.csv (name, company, url), enriches each prospect with live
+company data via the Clearbit API, generates a personalized outreach email
+using Groq, and saves results to output.csv.
 """
 import os
 import sys
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from openai import OpenAI
+from groq import Groq
 
 load_dotenv()
 
 INPUT_FILE = "prospects.csv"
 OUTPUT_FILE = "output.csv"
+MODEL = "llama-3.1-8b-instant"
 
 
 def scrape_homepage(url: str) -> str:
@@ -28,11 +31,92 @@ def scrape_homepage(url: str) -> str:
     return text[:3000]
 
 
-def generate_email(name: str, company: str, homepage_text: str, client: OpenAI) -> str:
+def enrich_company(domain: str) -> dict:
+    """
+    Fetch live company data from Clearbit's free Company API.
+    Returns a dict with keys: name, description, industry, employees,
+    location, twitter_bio, tech. Falls back gracefully on any error.
+    """
+    clearbit_key = os.getenv("CLEARBIT_API_KEY")
+    result = {}
+
+    if not clearbit_key:
+        return result
+
+    try:
+        resp = requests.get(
+            "https://company.clearbit.com/v2/companies/find",
+            params={"domain": domain},
+            auth=(clearbit_key, ""),
+            timeout=8,
+        )
+        if resp.status_code != 200:
+            return result
+
+        data = resp.json()
+        result["description"] = (data.get("description") or "").strip()
+        result["industry"] = (data.get("category") or {}).get("industry", "")
+        result["employees"] = data.get("metrics", {}).get("employees")
+        result["location"] = ", ".join(
+            filter(None, [
+                (data.get("geo") or {}).get("city"),
+                (data.get("geo") or {}).get("country"),
+            ])
+        )
+        result["twitter_bio"] = (
+            (data.get("twitter") or {}).get("bio") or ""
+        ).strip()
+        tech_list = [t.get("name", "") for t in (data.get("tech") or [])[:5]]
+        result["tech"] = ", ".join(filter(None, tech_list))
+    except Exception:
+        pass
+
+    return result
+
+
+def _domain_from_url(url: str) -> str:
+    parsed = urlparse(url)
+    host = parsed.netloc or parsed.path
+    return host.removeprefix("www.")
+
+
+def _format_enrichment(enrichment: dict) -> str:
+    if not enrichment:
+        return ""
+    lines = []
+    if enrichment.get("description"):
+        lines.append(f"Description: {enrichment['description']}")
+    if enrichment.get("industry"):
+        lines.append(f"Industry: {enrichment['industry']}")
+    if enrichment.get("employees"):
+        lines.append(f"Employees: {enrichment['employees']}")
+    if enrichment.get("location"):
+        lines.append(f"Location: {enrichment['location']}")
+    if enrichment.get("twitter_bio"):
+        lines.append(f"Brand voice: {enrichment['twitter_bio']}")
+    if enrichment.get("tech"):
+        lines.append(f"Tech stack: {enrichment['tech']}")
+    return "\n".join(lines)
+
+
+def generate_email(
+    name: str,
+    company: str,
+    homepage_text: str,
+    client: Groq,
+    enrichment: dict | None = None,
+) -> str:
+    enrichment_block = ""
+    if enrichment:
+        formatted = _format_enrichment(enrichment)
+        if formatted:
+            enrichment_block = f"\nLive company data:\n{formatted}\n"
+
     prompt = (
         f"You are writing a short, personalized cold outreach email asking {company} for sponsorship.\n\n"
         f"Prospect name: {name}\n"
         f"Company: {company}\n"
+        f"{enrichment_block}"
         f"Homepage content:\n{homepage_text}\n\n"
         "Write a 3-sentence email:\n"
         "1. A personalized opener referencing something specific about the company.\n"
@@ -41,7 +125,7 @@ def generate_email(name: str, company: str, homepage_text: str, client: OpenAI) 
         "Do not use placeholders like [Your Name]. Keep it natural and direct."
     )
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=200,
         temperature=0.7,
@@ -50,12 +134,16 @@ def generate_email(name: str, company: str, homepage_text: str, client: OpenAI) 
 
 
 def main():
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY not set. Copy .env.example to .env and add your key.", file=sys.stderr)
+        print("Error: GROQ_API_KEY not set. Add it to your .env file.", file=sys.stderr)
         sys.exit(1)
 
-    client = OpenAI(api_key=api_key)
+    clearbit_key = os.getenv("CLEARBIT_API_KEY")
+    if not clearbit_key:
+        print("Note: CLEARBIT_API_KEY not set — skipping enrichment step.")
+
+    client = Groq(api_key=api_key)
     df = pd.read_csv(INPUT_FILE)
     results = []
 
@@ -70,9 +158,16 @@ def main():
             results.append({"name": name, "company": company, "url": url, "email": f"ERROR: {e}"})
             continue
 
-        email = generate_email(name, company, homepage_text, client)
+        domain = _domain_from_url(url)
+        enrichment = enrich_company(domain)
+        if enrichment:
+            print(f"  Enriched: {enrichment.get('industry', '')} | {enrichment.get('employees', '?')} employees")
+        else:
+            print("  No enrichment data.")
+
+        email = generate_email(name, company, homepage_text, client, enrichment)
         results.append({"name": name, "company": company, "url": url, "email": email})
-        print(f"  Done.\n")
+        print("  Done.\n")
 
     out_df = pd.DataFrame(results)
     out_df.to_csv(OUTPUT_FILE, index=False)
