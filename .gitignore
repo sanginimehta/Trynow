@@ -2,7 +2,6 @@
 .env
 
 # generated outputs
-output.csv
 prospect_memory/
 
 # python
