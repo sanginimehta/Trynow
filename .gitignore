@@ -1,0 +1,20 @@
+# secrets — never commit
+.env
+
+# generated outputs
+output.csv
+prospect_memory/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# databases
+*.db
+
+# IDE
+.DS_Store
+.vscode/
