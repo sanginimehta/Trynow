@@ -4,8 +4,11 @@
 # generated outputs
 prospect_memory/
 
+
 # python
 __pycache__/
+core/__pycache__/
+webapp/__pycache__/
 *.pyc
 *.pyo
 .venv/

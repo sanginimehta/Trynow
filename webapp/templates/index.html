@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}SDR Agent — New Run{% endblock %}
+
+{% block content %}
+
+<!-- Page heading -->
+<div class="mb-8">
+  <h1 class="text-2xl font-bold text-gray-900">New outreach run</h1>
+  <p class="mt-1 text-gray-500">Tell the agent who you are, who you're targeting, and how deep to go.</p>
+</div>
+
+{% if error %}
+<div class="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="POST" action="/run" enctype="multipart/form-data" id="main-form">
+
+  <!-- ── Section 1: Your company ── -->
+  <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6 mb-6">
+    <div class="flex items-center gap-2 mb-5">
+      <div class="h-7 w-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+        <svg class="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+        </svg>
+      </div>
+      <h2 class="font-semibold text-gray-900">Your company</h2>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Company name <span class="text-red-500">*</span></label>
+        <input type="text" name="company_name" required placeholder="e.g. LogicGate"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Product name <span class="text-red-500">*</span></label>
+        <input type="text" name="product_name" required placeholder="e.g. Risk Cloud"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Company website</label>
+        <input type="url" name="company_website" placeholder="https://logicgate.com"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">What your product does <span class="text-red-500">*</span></label>
+        <textarea name="value_props" required rows="3" placeholder="A no-code GRC platform that helps regulated industries manage risk, compliance, and audit programs in one connected system. Key differentiators: pre-built control frameworks (SOC 2, FFIEC, NIST CSF), automated evidence collection, no-code configuration."
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none"></textarea>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ideal customer profile (ICP) <span class="text-red-500">*</span></label>
+        <textarea name="icp_description" required rows="3" placeholder="CISOs, Chief Risk Officers, and VP Compliance at financial services, healthcare, or manufacturing companies with 200-5000 employees. Must be in a regulated industry with compliance obligations (SOC 2, FFIEC, ISO 27001, HIPAA). Budget owners who currently manage GRC in spreadsheets or point solutions."
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section 2: Prospects ── -->
+  <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6 mb-6">
+    <div class="flex items-center gap-2 mb-5">
+      <div class="h-7 w-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+        <svg class="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
+        </svg>
+      </div>
+      <h2 class="font-semibold text-gray-900">Your prospects</h2>
+    </div>
+
+    <!-- Toggle -->
+    <div class="flex gap-2 mb-5">
+      <button type="button" id="btn-csv" onclick="showMode('csv')"
+        class="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white transition">
+        Upload CSV
+      </button>
+      <button type="button" id="btn-manual" onclick="showMode('manual')"
+        class="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 ring-1 ring-gray-300 hover:bg-gray-50 transition">
+        Enter manually
+      </button>
+    </div>
+
+    <!-- CSV upload -->
+    <div id="panel-csv">
+      <label class="block text-sm font-medium text-gray-700 mb-1">CSV file</label>
+      <input type="file" name="csv_file" accept=".csv"
+        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
+      <p class="mt-2 text-xs text-gray-400">
+        Required columns: <code class="bg-gray-100 px-1 rounded">name, title, company, industry</code>  &nbsp;·&nbsp; Optional: <code class="bg-gray-100 px-1 rounded">website</code>
+        &nbsp;·&nbsp; <a href="/sample-csv" class="text-indigo-600 hover:underline">Download template</a>
+      </p>
+    </div>
+
+    <!-- Manual entry -->
+    <div id="panel-manual" class="hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-3">Name</th>
+              <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-3">Title</th>
+              <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-3">Company</th>
+              <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-3">Industry</th>
+              <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wide pb-2 pr-3">Website</th>
+              <th class="pb-2"></th>
+            </tr>
+          </thead>
+          <tbody id="prospect-rows">
+            <!-- first row always present -->
+            <tr class="prospect-row">
+              <td class="pr-3 py-1.5"><input type="text" name="prospect_name" placeholder="Sarah Chen" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></td>
+              <td class="pr-3 py-1.5"><input type="text" name="prospect_title" placeholder="CISO" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></td>
+              <td class="pr-3 py-1.5"><input type="text" name="prospect_company" placeholder="Acme Bank" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></td>
+              <td class="pr-3 py-1.5"><input type="text" name="prospect_industry" placeholder="Financial Services" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></td>
+              <td class="pr-3 py-1.5"><input type="url" name="prospect_website" placeholder="https://..." class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></td>
+              <td class="py-1.5"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button type="button" onclick="addRow()"
+        class="mt-3 flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Add prospect
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Section 3: Mode ── -->
+  <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-6 mb-8">
+    <div class="flex items-center gap-2 mb-5">
+      <div class="h-7 w-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+        <svg class="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+      </div>
+      <h2 class="font-semibold text-gray-900">Research mode</h2>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+      <label class="cursor-pointer rounded-xl border-2 border-gray-200 p-5 hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+        <input type="radio" name="mode" value="bulk" class="sr-only" checked />
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+          <span class="font-semibold text-gray-900">Bulk pipeline</span>
+          <span class="ml-auto text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Fast</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">Scrapes homepages, enriches with Clearbit, writes emails via Groq. Best for 10+ prospects.</p>
+        <ul class="text-sm space-y-1">
+          <li class="flex items-center gap-1.5 text-gray-600"><span class="text-green-500">✓</span> Seconds per prospect</li>
+          <li class="flex items-center gap-1.5 text-gray-600"><span class="text-green-500">✓</span> Homepage scraping + Clearbit data</li>
+          <li class="flex items-center gap-1.5 text-gray-400"><span>✗</span> No real-time news research</li>
+          <li class="flex items-center gap-1.5 text-gray-400"><span>✗</span> No lead scoring or ICP filtering</li>
+        </ul>
+        <p class="mt-3 text-xs text-gray-400">Requires: <code class="bg-white px-1 rounded">GROQ_API_KEY</code></p>
+      </label>
+
+      <label class="cursor-pointer rounded-xl border-2 border-gray-200 p-5 hover:border-indigo-300 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+        <input type="radio" name="mode" value="agent" class="sr-only" />
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <span class="font-semibold text-gray-900">AI Agent</span>
+          <span class="ml-auto text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">Deep</span>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">Autonomously researches prospects, scores against your ICP, finds real news. Best for high-value accounts.</p>
+        <ul class="text-sm space-y-1">
+          <li class="flex items-center gap-1.5 text-gray-600"><span class="text-green-500">✓</span> Live web research + news</li>
+          <li class="flex items-center gap-1.5 text-gray-600"><span class="text-green-500">✓</span> Lead scoring — skips weak ICP fits</li>
+          <li class="flex items-center gap-1.5 text-gray-600"><span class="text-green-500">✓</span> Timing signals (M&A, breaches, filings)</li>
+          <li class="flex items-center gap-1.5 text-gray-400"><span>✗</span> 1–3 min per prospect</li>
+        </ul>
+        <p class="mt-3 text-xs text-gray-400">Requires: <code class="bg-white px-1 rounded">ANTHROPIC_API_KEY</code></p>
+      </label>
+
+    </div>
+  </div>
+
+  <!-- ── Submit ── -->
+  <button type="submit"
+    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 px-6 rounded-xl transition-colors text-base shadow-sm">
+    Run outreach agent →
+  </button>
+
+</form>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" class="hidden fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+  <div class="animate-spin h-10 w-10 rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+  <p class="text-gray-700 font-medium" id="loading-msg">Researching prospects…</p>
+  <p class="text-sm text-gray-400">This may take a minute for agent mode.</p>
+</div>
+
+<script>
+  // Prospect input mode toggle
+  function showMode(mode) {
+    const csvPanel    = document.getElementById('panel-csv');
+    const manualPanel = document.getElementById('panel-manual');
+    const btnCsv      = document.getElementById('btn-csv');
+    const btnManual   = document.getElementById('btn-manual');
+    const activeClass   = ['bg-indigo-600', 'text-white'];
+    const inactiveClass = ['bg-white', 'text-gray-600', 'ring-1', 'ring-gray-300', 'hover:bg-gray-50'];
+
+    if (mode === 'csv') {
+      csvPanel.classList.remove('hidden');
+      manualPanel.classList.add('hidden');
+      btnCsv.classList.add(...activeClass);
+      btnCsv.classList.remove(...inactiveClass);
+      btnManual.classList.add(...inactiveClass);
+      btnManual.classList.remove(...activeClass);
+    } else {
+      csvPanel.classList.add('hidden');
+      manualPanel.classList.remove('hidden');
+      btnManual.classList.add(...activeClass);
+      btnManual.classList.remove(...inactiveClass);
+      btnCsv.classList.add(...inactiveClass);
+      btnCsv.classList.remove(...activeClass);
+    }
+  }
+
+  // Add a prospect row
+  function addRow() {
+    const tbody = document.getElementById('prospect-rows');
+    const first = tbody.querySelector('.prospect-row');
+    const clone = first.cloneNode(true);
+    clone.querySelectorAll('input').forEach(i => i.value = '');
+    // Add remove button to cloned rows
+    const lastCell = clone.querySelector('td:last-child');
+    lastCell.innerHTML = `<button type="button" onclick="this.closest('tr').remove()"
+      class="text-gray-400 hover:text-red-500 transition p-1">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+      </svg>
+    </button>`;
+    tbody.appendChild(clone);
+  }
+
+  // Loading overlay
+  document.getElementById('main-form').addEventListener('submit', function (e) {
+    const mode = document.querySelector('input[name="mode"]:checked')?.value;
+    const msg = mode === 'agent'
+      ? 'Agent is researching prospects… (this takes 1–3 min per prospect)'
+      : 'Generating emails…';
+    document.getElementById('loading-msg').textContent = msg;
+    document.getElementById('loading-overlay').classList.remove('hidden');
+  });
+</script>
+
+{% endblock %}
