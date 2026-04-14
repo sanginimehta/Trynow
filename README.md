@@ -1,170 +1,133 @@
 # AI Sales Outreach Agent
 
-A B2B sales outreach system built in two layers: a bulk email generator and an agentic prospect researcher with persistent memory. Built to showcase practical AI application development using the Claude Agent SDK, Groq, and real-time web research.
+An AI-powered outreach system that researches prospects, scores them against your ICP, and writes personalized cold emails — grounded in real, current information about each company.
+
+Built for B2B sales teams selling GRC software (Risk Cloud by LogicGate) into regulated industries.
+
+---
+
+## The problem it solves
+
+A typical SDR spends 30–45 minutes researching a single high-value prospect before writing a cold email: reading news, checking LinkedIn, scanning 10-Ks, looking for a hook that doesn't feel generic. At scale, that's most of the working day — before a single word of outreach gets written.
+
+This tool automates that research and writes the email. The result is a message grounded in something real — a merger, a regulatory filing, a compliance initiative — not a mail-merge template with the company name swapped in.
 
 ---
 
 ## What it does
 
-### Layer 1 — Bulk email generator (`generate_emails.py`)
-- Reads a CSV of prospects
-- Scrapes each company's homepage for context
-- Enriches with live company data from Clearbit (industry, headcount, tech stack)
-- Generates a personalized 3-sentence outreach email via Groq (LLaMA 3.1)
-- Saves everything to `output.csv`
+**Step 1 — Lead scoring**
 
-### Layer 2 — Agentic prospect researcher (`prospect_agent.py`)
-- Uses the **Claude Agent SDK** to spawn an AI agent per prospect
-- Agent autonomously runs **WebSearch** and **WebFetch** to find recent news, regulatory filings, M&A activity, and compliance signals before writing anything
-- Writes a first-contact cold email grounded in real, current research
-- **Persists memory** per prospect — on follow-up runs, injects past emails into the prompt and instructs the agent to find a completely different angle
-- Streams live progress to the terminal (tool calls, token usage, turn count)
+Before writing anything, the agent researches each prospect and scores them 1–10 across three dimensions:
 
----
+- **ICP fit** — Is this the right industry (regulated), company size, and title (CISO, CRO, VP Compliance)?
+- **Timing signals** — Are there recent urgency triggers? A merger closing, a regulatory fine, a new CISO hire, a breach, an IPO?
+- **Reachability** — Is this a real decision-maker or a gatekeeper?
 
-## Architecture
+Prospects scoring below 6 are skipped. Only qualified leads get emails written.
 
-```
-prospect_agent.py
-│
-├── load_memory()          read prospect_memory/{company}__{name}.json
-│       ↓
-├── build_prompt()         first contact vs. follow-up (different instructions)
-│       ↓
-├── query()                Claude Agent SDK — spawns agent session
-│   ├── WebSearch          agent searches for news, compliance signals, M&A
-│   ├── WebFetch           agent reads company pages and news articles
-│   └── streams messages   SystemMessage → AssistantMessage (×N) → ResultMessage
-│       ↓
-└── save_memory()          append email + session_id + date to JSON file
-```
+**Step 2 — Personalized email generation**
 
-Memory file per prospect (`prospect_memory/`):
-```json
-{
-  "prospect": { "name": "Sarah Chen", "company": "Pinnacle Financial Partners", ... },
-  "interactions": [
-    {
-      "date": "2026-04-06T10:30:00",
-      "session_id": "abc123",
-      "email": "Subject: GRC complexity post-Synovus…\n\nHi Sarah,…"
-    }
-  ]
-}
-```
+For each lead that passes scoring, the agent reads recent news, regulatory filings, and company context, then writes a cold email that:
+
+- Opens with a specific hook tied to something happening at that company right now
+- Connects their compliance and risk challenges to what Risk Cloud solves
+- Closes with a low-pressure ask
+
+**Step 3 — Memory**
+
+Every email sent is saved per prospect. On the next outreach cycle, the agent reads the previous emails and finds a completely different angle — a new news hook, a different product angle, a relevant case study. It never sends the same message twice.
 
 ---
 
-## Real output example
+## Real output
 
-Running `prospect_agent.py` against a CISO at a mid-sized regional bank:
+**Scoring pass — 3 prospects evaluated:**
 
 ```
-  [memory] no prior interactions — writing first contact email
-  [session started] a1b2c3...
-  [turn 1] agent is working…
-  [turn 1 · WebSearch] "Pinnacle Financial Partners compliance 2025"
-  [turn 2] agent is working…
-  [turn 2 · WebFetch] https://www.pnfp.com/news/news-releases/...
-  [turn 3] agent is working…
-  [turn 3 · agent text] Subject: GRC complexity post-Synovus — how are you managing it?…
-  [done] stop_reason=end_turn  turns=3
-  [memory saved] prospect_memory/pinnacle_financial_partners__sarah_chen.json
+  Prospect                          Score   Decision
+  ------------------------------------------------
+  Sarah Chen @ Pinnacle Financial   8.5/10  EMAIL →
+  Marcus Webb @ Denny's Corp        3.0/10  SKIP
+  Jennifer Park @ Regions Financial 7.5/10  EMAIL →
 ```
 
-Generated email (first contact):
-```
-Subject: GRC complexity post-Synovus — how are you managing it?
+**Email generated for Sarah Chen, CISO, Pinnacle Financial Partners:**
 
-Hi Sarah,
+> **Subject: GRC at $119B — before the next exam cycle**
+>
+> Sarah,
+>
+> Closing a merger the size of Pinnacle + Synovus on January 2nd is no small feat — but I'd imagine the GRC aftermath is still very much in motion: two control libraries, two audit programs, two vendor risk inventories, and examiners who won't wait for the dust to settle.
+>
+> That's exactly where Risk Cloud tends to show up for regional banks at inflection points like this. We replace the patchwork of spreadsheets and point tools with a single connected platform — pre-mapped to FFIEC, NIST CSF, and PCI-DSS — so your team gets unified risk visibility across the combined entity without a lengthy implementation.
+>
+> I'd welcome a 20-minute conversation to share how a few other post-merger regional banks have used Risk Cloud to consolidate fast. Worth a slot this month?
 
-Congratulations on clearing federal regulatory approval for the Synovus merger.
-Combining two $50B+ banks is a major milestone — but I imagine the integration
-work ahead is keeping your team busy. Two separate control environments, overlapping
-vendor inventories, and divergent IT risk frameworks all converging at once is exactly
-the scenario where spreadsheet-based GRC programs start to crack.
+The agent found the Synovus merger news on its own. No human input beyond the prospect's name and company.
 
-That's where we help. Risk Cloud by LogicGate gives security and compliance teams a
-single platform to unify control frameworks (FFIEC, SOC 2, NIST CSF), automate
-evidence collection, and maintain real-time risk visibility — without relying on IT.
+**Follow-up email (run #2 — different angle, found automatically):**
 
-Would a 20-minute call be worth your time? Happy to show how other banks have tackled
-post-merger GRC consolidation, or send a case study first if that's more useful.
+> **Subject: Running two tech stacks through Q2 2027 — the compliance math**
+>
+> Sarah,
+>
+> Saw that Pinnacle's full system conversion is expected around Q2 2027 — meaning your team is managing compliance across two parallel environments for the better part of a year. Two control sets, two evidence trails, two audit scopes, one board report due quarterly.
+>
+> Risk Cloud handles this well. Regional banks in mid-integration use it to maintain a single view across disparate systems — automated evidence collection, unified control mapping, workflow-driven assessments — so you're not stitching together a risk posture while the core conversion is still months out.
+>
+> I can share a case study from a bank that used Risk Cloud to stay examiner-ready through a multi-year core migration. Worth 20 minutes before the Q2 sprint kicks in?
 
-— [Your Name], LogicGate
-```
-
-The agent found the Synovus merger news autonomously — no human input beyond the prospect's name and company.
+Same prospect, second touchpoint, completely different hook — found because the agent checked what it had already sent and went looking for something new.
 
 ---
 
-## Setup
+## How to run it
 
 ```bash
 git clone https://github.com/sanginimehta/Trynow.git
 cd Trynow
 pip install -r requirements.txt
-cp .env.example .env
-# fill in your keys
-```
-
-### API keys
-
-| Variable | Used by | Where to get it |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | `prospect_agent.py` | [console.anthropic.com](https://console.anthropic.com) |
-| `GROQ_API_KEY` | `generate_emails.py` | [console.groq.com](https://console.groq.com) — free tier |
-| `CLEARBIT_API_KEY` | `generate_emails.py` | [clearbit.com](https://clearbit.com) — optional |
-
----
-
-## Usage
-
-### Agentic researcher (Layer 2)
-
-```bash
+cp .env.example .env   # add your ANTHROPIC_API_KEY
 python prospect_agent.py
 ```
 
-Run it once → first contact email, memory file created.
-Run it again → follow-up email with a different hook, memory file updated.
-
-To research a different prospect, edit the `prospect` dict in `main()`:
+To add your own prospects, edit the list in `prospect_agent.py`:
 
 ```python
-prospect = {
-    "name": "Jane Smith",
-    "title": "Chief Information Security Officer",
-    "company": "Acme Bank",
-    "industry": "Financial Services",
-    "website": "https://acmebank.com",
-}
-```
-
-### Bulk generator (Layer 1)
-
-Add prospects to `prospects.csv`:
-
-```csv
-name,company,url
-Jane Smith,Acme Corp,https://acme.com
-```
-
-```bash
-python generate_emails.py   # outputs to output.csv
-python email_opener.py "Stripe" https://stripe.com   # single prospect CLI
+prospects = [
+    {
+        "name": "First Last",
+        "title": "Chief Information Security Officer",
+        "company": "Company Name",
+        "industry": "Financial Services",
+        "website": "https://company.com",
+    },
+    ...
+]
 ```
 
 ---
 
-## Tech stack
+## Files
 
-| Component | Technology |
+| File | What it does |
 |---|---|
-| AI agent framework | [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python) |
-| Agent model | Claude (via Anthropic) |
-| Bulk email model | LLaMA 3.1 8B via [Groq](https://groq.com) |
-| Company enrichment | [Clearbit](https://clearbit.com) |
-| Web research | Claude built-in WebSearch + WebFetch tools |
-| Memory | File-based JSON, one file per prospect |
-| Async runtime | [anyio](https://anyio.readthedocs.io) |
+| `prospect_agent.py` | AI agent: scores leads, researches prospects, writes emails, remembers what was sent |
+| `generate_emails.py` | Bulk pipeline: reads a CSV, scrapes homepages, writes emails at scale via Groq |
+| `agent_output.csv` | Sample output from the agent — two emails for one prospect, different angles |
+| `output.csv` | Sample output from the bulk pipeline — Nike and Stripe |
+| `prospect_memory/` | Per-prospect JSON files storing scores and every email ever sent |
+
+---
+
+## Why two approaches?
+
+| | Bulk pipeline (`generate_emails.py`) | Agent (`prospect_agent.py`) |
+|---|---|---|
+| Speed | Fast — seconds per prospect | Slower — minutes per prospect |
+| Cost | Low | Higher |
+| Personalization | Good — based on homepage + enrichment | High — based on live research |
+| Best for | Top-of-funnel, high volume | High-value accounts, ABM |
+
+In a real workflow: run the pipeline to process a large list, use the agent for your top accounts.
