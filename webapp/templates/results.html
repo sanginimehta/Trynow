@@ -45,8 +45,10 @@
         <span class="font-semibold text-gray-900">{{ r.name }}</span>
 
         <!-- Mode badge -->
-        {% if r.mode == 'agent' %}
-        <span class="text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">AI Agent</span>
+        {% if r.mode == 'autopilot' %}
+        <span class="text-xs font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">Autopilot</span>
+        {% elif r.mode == 'agent' %}
+        <span class="text-xs font-medium text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">AI Agent</span>
         {% else %}
         <span class="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">Bulk</span>
         {% endif %}

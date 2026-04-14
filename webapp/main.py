@@ -9,7 +9,6 @@ import os
 import uuid
 from datetime import datetime
 
-import anyio
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -33,7 +32,7 @@ results_store: dict[str, list] = {}
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.post("/run")
@@ -45,11 +44,13 @@ async def run(
     company_website: str = Form(""),
     value_props: str = Form(...),
     icp_description: str = Form(...),
-    # Mode
-    mode: str = Form(...),  # "bulk" or "agent"
-    # Prospects — CSV upload
+    # Mode: "autopilot", "agent", or "bulk"
+    mode: str = Form(...),
+    # Autopilot only — how many prospects to discover
+    prospect_count: int = Form(default=5),
+    # Bulk/agent only — CSV upload
     csv_file: UploadFile = File(None),
-    # Prospects — manual (sent as repeated form fields)
+    # Bulk/agent only — manual rows
     prospect_name: list[str] = Form(default=[]),
     prospect_title: list[str] = Form(default=[]),
     prospect_company: list[str] = Form(default=[]),
@@ -64,7 +65,14 @@ async def run(
         icp_description=icp_description,
     )
 
-    # Build prospect list from CSV upload or manual fields
+    # Autopilot: agent discovers prospects itself — no list needed from user
+    if mode == "autopilot":
+        results = await _run_autopilot(ctx, max(1, min(prospect_count, 10)))
+        job_id = str(uuid.uuid4())
+        results_store[job_id] = [result_to_dict(r) for r in results]
+        return RedirectResponse(f"/results/{job_id}", status_code=303)
+
+    # Bulk / agent: build prospect list from CSV or manual input
     prospects: list[Prospect] = []
 
     if csv_file and csv_file.filename:
@@ -92,9 +100,8 @@ async def run(
             ))
 
     if not prospects:
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": "No prospects found. Please upload a CSV or add prospects manually.",
+        return templates.TemplateResponse(request, "index.html", {
+            "error": "No prospects found. Please upload a CSV or add at least one prospect manually.",
         })
 
     # Run the selected pipeline
@@ -122,8 +129,7 @@ async def show_results(request: Request, job_id: str):
     skipped = [r for r in results if r["skipped"]]
     errored = [r for r in results if r["error"]]
 
-    return templates.TemplateResponse("results.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "results.html", {
         "results": results,
         "job_id": job_id,
         "total": len(results),
@@ -230,6 +236,67 @@ async def _run_bulk(prospects: list[Prospect], ctx: CompanyContext) -> list[Outr
     return results
 
 
+async def _run_autopilot(ctx: CompanyContext, count: int) -> list[OutreachResult]:
+    """
+    Full autopilot: agent discovers prospects that match the ICP,
+    scores each one, and writes personalized emails — no prospect list needed.
+    """
+    from core.agent import discover_prospects, score_lead, research_and_email, SCORE_THRESHOLD
+
+    # Step 1: discover
+    print(f"\n[autopilot] Starting prospect discovery (target: {count})")
+    try:
+        prospects = await discover_prospects(ctx, count=count)
+    except Exception as e:
+        print(f"  Discovery failed: {e}")
+        dummy = Prospect(name="Discovery failed", title="", company="", industry="")
+        return [OutreachResult(prospect=dummy, mode="autopilot", error=str(e))]
+
+    if not prospects:
+        dummy = Prospect(name="No prospects found", title="", company="", industry="")
+        return [OutreachResult(
+            prospect=dummy,
+            mode="autopilot",
+            error="Agent could not find prospects matching your ICP. Try broadening your ICP description.",
+        )]
+
+    # Step 2: score + email (same as _run_agent)
+    results = []
+    for p in prospects:
+        print(f"\n[autopilot] Scoring {p.name} @ {p.company}")
+        try:
+            score = await score_lead(p, ctx)
+            print(f"  Score: {score.total}/10  ({'PASS' if not score.skip else 'SKIP'})")
+
+            if score.skip:
+                results.append(OutreachResult(
+                    prospect=p,
+                    mode="autopilot",
+                    skipped=True,
+                    skip_reason=f"Score {score.total}/10 — below threshold ({SCORE_THRESHOLD})",
+                    score=score,
+                    date_generated=datetime.now().isoformat(timespec="seconds"),
+                ))
+                continue
+
+            print("  Generating email…")
+            subject, body = await research_and_email(p, ctx)
+            results.append(OutreachResult(
+                prospect=p,
+                mode="autopilot",
+                score=score,
+                email_subject=subject,
+                email_body=body,
+                date_generated=datetime.now().isoformat(timespec="seconds"),
+            ))
+
+        except Exception as e:
+            print(f"  Error: {e}")
+            results.append(OutreachResult(prospect=p, mode="autopilot", error=str(e)))
+
+    return results
+
+
 async def _run_agent(prospects: list[Prospect], ctx: CompanyContext) -> list[OutreachResult]:
     from core.agent import score_lead, research_and_email, SCORE_THRESHOLD
 
@@ -252,7 +319,7 @@ async def _run_agent(prospects: list[Prospect], ctx: CompanyContext) -> list[Out
                 ))
                 continue
 
-            print(f"  Generating email…")
+            print("  Generating email…")
             subject, body = await research_and_email(p, ctx)
             results.append(OutreachResult(
                 prospect=p,

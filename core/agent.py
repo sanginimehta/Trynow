@@ -23,6 +23,39 @@ SCORE_THRESHOLD = 6
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _parse_prospects(text: str) -> list[dict]:
+    """
+    Parse the discovery agent's output into a list of prospect dicts.
+    Expects repeated blocks of labelled lines:
+      NAME: ...
+      TITLE: ...
+      COMPANY: ...
+      INDUSTRY: ...
+      WEBSITE: ...  (optional)
+    Blocks are separated by blank lines or dashes.
+    """
+    prospects = []
+    current: dict = {}
+
+    for line in text.splitlines():
+        line = line.strip().lstrip("-").strip()
+        if not line:
+            if current.get("name") and current.get("company"):
+                prospects.append(current)
+                current = {}
+            continue
+        for field in ("name", "title", "company", "industry", "website"):
+            m = re.match(rf"{field}\s*:\s*(.+)", line, re.IGNORECASE)
+            if m:
+                current[field] = m.group(1).strip()
+                break
+
+    # Catch last block if file doesn't end with blank line
+    if current.get("name") and current.get("company"):
+        prospects.append(current)
+
+    return prospects
+
 def _print_step(label: str, detail: str = "") -> None:
     if detail:
         print(f"  [{label}] {detail}")
@@ -253,3 +286,81 @@ Output ONLY the email. No preamble."""
             raw_text = message.result
 
     return parse_email(raw_text)
+
+
+async def discover_prospects(ctx: CompanyContext, count: int = 5) -> list[Prospect]:
+    """
+    Autonomously find `count` real prospects that match ctx.icp_description.
+
+    The agent searches the web for companies that fit the ICP, identifies the
+    right decision-maker at each one, and returns them as Prospect objects.
+    The caller then passes these straight into score_lead() + research_and_email().
+
+    Args:
+        ctx:   CompanyContext describing the seller and their ICP
+        count: how many prospects to return (default 5)
+
+    Returns:
+        List of Prospect objects (may be fewer than count if not enough found)
+    """
+    prompt = f"""You are a B2B sales researcher for {ctx.name}, which sells {ctx.product}.
+
+Your job: find {count} real, named decision-makers at companies that match this ICP:
+
+{ctx.icp_description}
+
+Steps:
+1. Search for companies that match this ICP — focus on finding real company names,
+   not generic descriptions. Be specific: search for actual named companies.
+2. For each company you find, search for the right decision-maker title
+   (e.g. CISO, Chief Risk Officer, VP Compliance, Head of Security) and find
+   a real named person in that role if possible. Use LinkedIn search queries,
+   press releases, company leadership pages, or news articles.
+3. Return exactly {count} prospects in the format below. Only include real people
+   and companies you actually found evidence for — do not fabricate names.
+
+Output format — one block per prospect, separated by a blank line:
+
+NAME: <full name>
+TITLE: <job title>
+COMPANY: <company name>
+INDUSTRY: <industry>
+WEBSITE: <company website URL>
+
+Output ONLY the {count} prospect blocks. No introduction, no explanation."""
+
+    raw_text = ""
+    turn = 0
+
+    print(f"\n[discovery] Searching for {count} prospects matching ICP…")
+
+    async for message in query(
+        prompt=prompt,
+        options=ClaudeAgentOptions(
+            allowed_tools=["WebSearch", "WebFetch"],
+            max_turns=12,
+        ),
+    ):
+        if isinstance(message, SystemMessage) and message.subtype == "init":
+            _print_step("discovery session", message.data.get("session_id", "")[:8])
+        elif isinstance(message, AssistantMessage):
+            turn += 1
+            _log_message(message, turn)
+        elif isinstance(message, ResultMessage):
+            _print_step("discovery done", f"turns={turn}")
+            raw_text = message.result
+
+    parsed = _parse_prospects(raw_text)
+    print(f"  Found {len(parsed)} prospect(s)")
+
+    return [
+        Prospect(
+            name=p.get("name", "Unknown"),
+            title=p.get("title", ""),
+            company=p.get("company", ""),
+            industry=p.get("industry", ""),
+            website=p.get("website", ""),
+        )
+        for p in parsed
+        if p.get("name") and p.get("company")
+    ]
