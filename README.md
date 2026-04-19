@@ -2,7 +2,9 @@
 
 An AI-powered outreach system that researches prospects, scores them against your ICP, and writes personalized cold emails — grounded in real, current information about each company.
 
-Built for B2B sales teams selling GRC software (Risk Cloud by LogicGate) into regulated industries.
+Works for any B2B company. Enter your product, value props, and ideal customer profile — the agent handles the rest.
+
+**[Try the web app](#how-to-run-it)** · Built with Claude Agent SDK + FastAPI + Tailwind CSS
 
 ---
 
@@ -82,52 +84,59 @@ Same prospect, second touchpoint, completely different hook — found because th
 
 ---
 
+## Three modes
+
+| Mode | How it works | Best for |
+|---|---|---|
+| **Autopilot** | Describe your ICP — the agent finds real prospects, scores them, and writes emails. No list needed. | Starting from scratch, net-new markets |
+| **AI Agent** | Upload your own prospect list — the agent researches, scores, and personalizes each one. | ABM, high-value accounts |
+| **Bulk** | Upload a CSV — fast email generation via LLaMA 3.3 (Groq). No scoring. | High-volume top-of-funnel |
+
+---
+
 ## How to run it
+
+### Web app (recommended)
 
 ```bash
 git clone https://github.com/sanginimehta/Trynow.git
 cd Trynow
 pip install -r requirements.txt
-cp .env.example .env   # add your ANTHROPIC_API_KEY
-python prospect_agent.py
+cp .env.example .env   # add ANTHROPIC_API_KEY (and optionally GROQ_API_KEY)
+uvicorn webapp.main:app --reload
 ```
 
-To add your own prospects, edit the list in `prospect_agent.py`:
+Open `http://localhost:8000`. Enter your company context, pick a mode, and run.
 
-```python
-prospects = [
-    {
-        "name": "First Last",
-        "title": "Chief Information Security Officer",
-        "company": "Company Name",
-        "industry": "Financial Services",
-        "website": "https://company.com",
-    },
-    ...
-]
+### Command line (original scripts)
+
+```bash
+python prospect_agent.py   # agent mode with memory
+python generate_emails.py  # bulk pipeline
 ```
 
 ---
 
 ## Files
 
-| File | What it does |
+| File / Folder | What it does |
 |---|---|
-| `prospect_agent.py` | AI agent: scores leads, researches prospects, writes emails, remembers what was sent |
-| `generate_emails.py` | Bulk pipeline: reads a CSV, scrapes homepages, writes emails at scale via Groq |
-| `agent_output.csv` | Sample output from the agent — two emails for one prospect, different angles |
-| `output.csv` | Sample output from the bulk pipeline — Nike and Stripe |
-| `prospect_memory/` | Per-prospect JSON files storing scores and every email ever sent |
+| `webapp/` | FastAPI web app — form UI, job management, CSV download |
+| `core/agent.py` | Claude Agent SDK: scoring, email research, autopilot discovery |
+| `core/pipeline.py` | Bulk pipeline: homepage scraping + Groq email generation |
+| `core/models.py` | Shared data models (`Prospect`, `LeadScore`, `OutreachResult`) |
+| `agent_output.csv` | Sample agent output — two emails for one prospect, different angles |
+| `output.csv` | Sample bulk output — Nike and Stripe |
 
 ---
 
 ## Why two approaches?
 
-| | Bulk pipeline (`generate_emails.py`) | Agent (`prospect_agent.py`) |
+| | Bulk pipeline | AI Agent / Autopilot |
 |---|---|---|
-| Speed | Fast — seconds per prospect | Slower — minutes per prospect |
-| Cost | Low | Higher |
-| Personalization | Good — based on homepage + enrichment | High — based on live research |
+| Speed | Seconds per prospect | Minutes per prospect |
+| Cost | Low (open-source LLM) | Higher (Claude) |
+| Personalization | Good — homepage + enrichment | High — live web research |
 | Best for | Top-of-funnel, high volume | High-value accounts, ABM |
 
-In a real workflow: run the pipeline to process a large list, use the agent for your top accounts.
+In a real GTM workflow: bulk to process the long tail, agent for your top accounts.
